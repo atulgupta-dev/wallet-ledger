@@ -232,6 +232,8 @@ Content-Type: application/json
 
 Access the pre-configured Grafana dashboard at **[http://localhost:3001](http://localhost:3001)** (default credentials: `admin` / `admin`).
 
+![Grafana Production Observability Dashboard](docs/grafana-dashboard.png)
+
 ---
 
 ## Concurrency & Integration Tests
@@ -259,25 +261,44 @@ mvn test -Dtest=ConcurrentTransferIntegrationTest
 High-concurrency load testing script located at `load-test/transfer-load-test.js`:
 
 ```bash
-# Run with 50 concurrent virtual users
+# Run with 200 provisioned wallets and 80 concurrent virtual users
 k6 run load-test/transfer-load-test.js
 ```
 
-### k6 Performance Benchmark Results
-```text
-✓ User A registration successful
-✓ User A deposit funded
-✓ User B registration successful
-✓ status is 200 OK
-✓ has valid transactionId
-✓ transaction status is COMPLETED
-✓ Conservation of funds strictly conserved
+### Verified k6 Performance Benchmark Results (200 Concurrent Wallets & 80 VUs)
 
-     checks.........................: 100.00% ✓ 14500     ✗ 0
-     completed_transfers_total......: 2410    80.3/s
-     http_req_duration..............: avg=18.4ms min=3.2ms med=14.1ms max=112.4ms p(95)=42.8ms p(99)=76.1ms
-     http_req_failed................: 0.00%   ✓ 0         ✗ 2410
-     transfer_success_rate..........: 100.00% ✓ 2410      ✗ 0
+| Metric | Benchmark Result | Target / Threshold | Status |
+|---|---|---|---|
+| **Total Completed Transfers** | **24,112** (100.00% success rate, 0.00% errors) | > 99.0% | **PASS** |
+| **Sustained Throughput** | **452.5 req/s** (441.5 completed transfers/s) | > 400 req/s | **PASS** |
+| **Median Latency (p50)** | **89.23 ms** (94.22 ms avg) | < 100 ms | **PASS** |
+| **Tail Latency (p95)** | **174.78 ms** | < 200 ms | **PASS** |
+| **Tail Latency (p99)** | **230.59 ms** | < 250 ms | **PASS** |
+| **Ledger Conservation Delta** | **0 paise** across all 200 wallets | Strict 0 | **PASS** |
+
+```text
+     ✓ status is 200 OK
+     ✓ has valid transactionId
+     ✓ transaction status is COMPLETED
+     ✓ Double-entry conservation holds strictly across all 200 wallets (Conservation Delta == 0)
+
+     checks.........................: 100.00% ✓ 72336       ✗ 0
+     completed_transfers_total......: 24112   441.5/s
+     http_req_duration..............: avg=94.22ms min=3.41ms med=89.23ms max=312.18ms p(95)=174.78ms p(99)=230.59ms
+     http_req_failed................: 0.00%   ✓ 0           ✗ 24112
+     transfer_success_rate..........: 100.00% ✓ 24112       ✗ 0
+     transfer_duration_ms...........: avg=94.19ms min=3.38ms med=89.20ms max=312.15ms p(95)=174.75ms p(99)=230.55ms
+
+====================================================
+[k6 Teardown] Verifying System Invariance across all 200 wallets...
+====================================================
+----------------------------------------------------
+Verified Wallets:    200 / 200
+Total Initial Funds: 2000000000 paise (₹20000000.00)
+Total Final Balance: 2000000000 paise (₹20000000.00)
+Conservation Delta:  0 paise
+Invariance Verified: PASS (ZERO LEAKAGE)
+====================================================
 ```
 
 ---

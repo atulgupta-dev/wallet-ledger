@@ -16,3 +16,7 @@ spring:
 security:
   rate-limit:
     enabled: false
+
+app:
+  rate-limit:
+    enabled: false

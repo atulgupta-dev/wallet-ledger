@@ -90,11 +90,13 @@ security:
     secret: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
     expiration-ms: ${JWT_EXPIRATION_MS:86400000}
   rate-limit:
-    enabled: ${RATE_LIMIT_ENABLED:false}
-    limit: ${RATE_LIMIT_MAX:1000}
+    enabled: ${RATE_LIMIT_ENABLED:true}
+    limit: ${RATE_LIMIT_MAX:60}
     window-seconds: ${RATE_LIMIT_WINDOW_SECONDS:60}
 
 app:
   rate-limit:
-    enabled: false
+    enabled: ${RATE_LIMIT_ENABLED:true}
+    limit: ${RATE_LIMIT_MAX:60}
+    window-seconds: ${RATE_LIMIT_WINDOW_SECONDS:60}
 

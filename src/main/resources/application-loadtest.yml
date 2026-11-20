@@ -1,0 +1,8 @@
+# Configuration for running high-throughput k6 benchmarks without rate limiting self-throttling
+security:
+  rate-limit:
+    enabled: false
+
+app:
+  rate-limit:
+    enabled: false

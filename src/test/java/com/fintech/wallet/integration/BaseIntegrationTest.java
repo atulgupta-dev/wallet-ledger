@@ -67,6 +67,7 @@ public abstract class BaseIntegrationTest {
         registry.add("spring.kafka.bootstrap-servers", kafka::getBootstrapServers);
 
         registry.add("security.rate-limit.enabled", () -> "false");
+        registry.add("app.rate-limit.enabled", () -> "false");
     }
 
     @Autowired
