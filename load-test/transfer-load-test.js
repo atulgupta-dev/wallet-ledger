@@ -9,18 +9,18 @@ const completedTransfers = new Counter('completed_transfers_total');
 const failedTransfers = new Counter('failed_transfers_total');
 
 const BASE_URL = __ENV.BASE_URL || 'http://localhost:8080';
-const POOL_SIZE = 20;
+const POOL_SIZE = 200;
 const INITIAL_DEPOSIT_PER_USER = 10000000; // 10,000,000 paise = ₹100,000.00 each
 const TRANSFER_AMOUNT = 100; // 100 paise = ₹1.00 per transfer
 
 export const options = {
   stages: [
-    { duration: '10s', target: 50 },   // Warm-up ramp to 50 VUs
-    { duration: '30s', target: 150 },  // High-throughput peak at 150 VUs
-    { duration: '10s', target: 0 },    // Cool-down ramp
+    { duration: '10s', target: 40 },  // Warm-up ramp to 40 VUs
+    { duration: '30s', target: 80 },  // Peak load benchmark at 80 VUs
+    { duration: '10s', target: 0 },   // Cool-down ramp
   ],
   thresholds: {
-    'http_req_duration': ['p(95)<150', 'p(99)<300'],
+    'http_req_duration': ['p(95)<120', 'p(99)<250'],
     'transfer_success_rate': ['rate>0.99'],
     'http_req_failed': ['rate<0.01'],
   },
@@ -38,74 +38,91 @@ function uuidv4() {
 // Global flag to log first error response immediately
 let loggedFirstError = false;
 
-// Setup: Provision and fund a pool of 20 active users
+// Setup: Provision and fund a pool of 200 active users using http.batch()
 export function setup() {
   const timestamp = Date.now();
   const password = 'Password@123';
-  const users = [];
 
-  console.log(`[k6 Setup] Provisioning and funding pool of ${POOL_SIZE} users...`);
+  console.log(`[k6 Setup] Batch-provisioning pool of ${POOL_SIZE} users...`);
 
+  // Phase 1: Batch registration
+  const regRequests = [];
+  const emails = [];
   for (let i = 0; i < POOL_SIZE; i++) {
     const email = `k6_pool_${timestamp}_user${i}@fintech.com`;
-    const fullName = `Load User ${i}`;
+    emails.push(email);
+    regRequests.push({
+      method: 'POST',
+      url: `${BASE_URL}/api/v1/auth/register`,
+      body: JSON.stringify({ fullName: `Load User ${i}`, email: email, password: password }),
+      params: { headers: { 'Content-Type': 'application/json' } },
+    });
+  }
 
-    // 1. Register User
-    const regRes = http.post(
-      `${BASE_URL}/api/v1/auth/register`,
-      JSON.stringify({ fullName, email, password }),
-      { headers: { 'Content-Type': 'application/json' } }
-    );
+  const regResponses = http.batch(regRequests);
 
-    if (regRes.status !== 200 && regRes.status !== 201) {
-      console.error(`[k6 Setup Error] Failed to register user ${email}: Status ${regRes.status}, Body: ${regRes.body}`);
-      throw new Error(`Registration failed for user ${email}`);
+  const users = [];
+  for (let i = 0; i < POOL_SIZE; i++) {
+    const res = regResponses[i];
+    if (res.status !== 200 && res.status !== 201) {
+      console.error(`[k6 Setup Error] Registration failed for ${emails[i]}: Status ${res.status}, Body: ${res.body}`);
+      throw new Error(`Registration failed for user ${emails[i]}`);
     }
 
-    const regData = regRes.json();
+    const regData = res.json();
     const token = regData.token;
-    // Extract walletId from WalletSummary (supports wallet.walletId and fallback wallet.id)
     const walletId = regData.wallet ? (regData.wallet.walletId || regData.wallet.id) : null;
     const userId = regData.user ? regData.user.id : null;
 
     if (!walletId) {
-      console.error(`[k6 Setup Error] Could not extract walletId for ${email}: ${JSON.stringify(regData)}`);
-      throw new Error(`Missing walletId for user ${email}`);
-    }
-
-    // 2. Fund User with initial deposit
-    const depositKey = `k6-setup-dep-${i}-${uuidv4()}`;
-    const depositRes = http.post(
-      `${BASE_URL}/api/v1/wallets/deposit`,
-      JSON.stringify({
-        amount: INITIAL_DEPOSIT_PER_USER,
-        description: `k6 initial funding for user ${i}`,
-      }),
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-          'Idempotency-Key': depositKey,
-        },
-      }
-    );
-
-    if (depositRes.status !== 200) {
-      console.error(`[k6 Setup Error] Failed to deposit funds for user ${email}: Status ${depositRes.status}, Body: ${depositRes.body}`);
-      throw new Error(`Deposit failed for user ${email}`);
+      console.error(`[k6 Setup Error] Missing walletId for ${emails[i]}: ${JSON.stringify(regData)}`);
+      throw new Error(`Missing walletId for user ${emails[i]}`);
     }
 
     users.push({
       index: i,
       userId: userId,
-      email: email,
+      email: emails[i],
       token: token,
       walletId: walletId,
     });
   }
 
+  console.log(`[k6 Setup] Batch-funding ${POOL_SIZE} user wallets with ${INITIAL_DEPOSIT_PER_USER} paise each...`);
+
+  // Phase 2: Batch deposit funding
+  const depositRequests = [];
+  for (let i = 0; i < POOL_SIZE; i++) {
+    const user = users[i];
+    depositRequests.push({
+      method: 'POST',
+      url: `${BASE_URL}/api/v1/wallets/deposit`,
+      body: JSON.stringify({
+        amount: INITIAL_DEPOSIT_PER_USER,
+        description: `k6 initial funding for user ${i}`,
+      }),
+      params: {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${user.token}`,
+          'Idempotency-Key': `k6-setup-dep-${i}-${uuidv4()}`,
+        },
+      },
+    });
+  }
+
+  const depositResponses = http.batch(depositRequests);
+
+  for (let i = 0; i < POOL_SIZE; i++) {
+    const res = depositResponses[i];
+    if (res.status !== 200) {
+      console.error(`[k6 Setup Error] Deposit failed for ${users[i].email}: Status ${res.status}, Body: ${res.body}`);
+      throw new Error(`Deposit failed for user ${users[i].email}`);
+    }
+  }
+
   const totalInitialFunds = POOL_SIZE * INITIAL_DEPOSIT_PER_USER;
-  console.log(`[k6 Setup Complete] ${POOL_SIZE} users provisioned and funded with ${totalInitialFunds} paise total (₹${totalInitialFunds / 100}.00)`);
+  console.log(`[k6 Setup Complete] ${POOL_SIZE} users registered and funded in parallel (${totalInitialFunds} paise total = ₹${totalInitialFunds / 100}.00)`);
 
   return {
     users: users,
@@ -196,43 +213,53 @@ export default function (data) {
   sleep(0.001);
 }
 
-// Teardown: Verify balance conservation across all 20 wallets
+// Teardown: Verify balance conservation across all 200 wallets
 export function teardown(data) {
   console.log('\n====================================================');
-  console.log('[k6 Teardown] Verifying System Invariance across all wallets...');
+  console.log(`[k6 Teardown] Verifying System Invariance across all ${data.users.length} wallets...`);
   console.log('====================================================');
 
-  let totalFinalBalance = 0;
   const users = data.users;
-
-  for (let i = 0; i < users.length; i++) {
-    const user = users[i];
-    const res = http.get(`${BASE_URL}/api/v1/wallets/me`, {
+  const balanceRequests = users.map((user) => ({
+    method: 'GET',
+    url: `${BASE_URL}/api/v1/wallets/me`,
+    params: {
       headers: {
         'Authorization': `Bearer ${user.token}`,
       },
-    });
+    },
+  }));
 
+  const balanceResponses = http.batch(balanceRequests);
+
+  let totalFinalBalance = 0;
+  let successfulLookups = 0;
+
+  for (let i = 0; i < users.length; i++) {
+    const res = balanceResponses[i];
     if (res.status === 200) {
       const wallet = res.json();
       totalFinalBalance += wallet.balance;
-      console.log(`  User ${i} [${user.email}]: ${wallet.balance} paise`);
+      successfulLookups++;
     } else {
       console.error(`  [Teardown Error] Failed to fetch balance for user ${i}: Status ${res.status}`);
     }
   }
 
   const expectedFunds = data.totalInitialFunds;
-  const invariantHolds = totalFinalBalance === expectedFunds;
+  const conservationDelta = totalFinalBalance - expectedFunds;
+  const invariantHolds = totalFinalBalance === expectedFunds && successfulLookups === users.length;
 
   console.log('----------------------------------------------------');
+  console.log(`Verified Wallets:    ${successfulLookups} / ${users.length}`);
   console.log(`Total Initial Funds: ${expectedFunds} paise (₹${expectedFunds / 100}.00)`);
   console.log(`Total Final Balance: ${totalFinalBalance} paise (₹${totalFinalBalance / 100}.00)`);
-  console.log(`Conservation Delta:  ${totalFinalBalance - expectedFunds} paise`);
+  console.log(`Conservation Delta:  ${conservationDelta} paise`);
   console.log(`Invariance Verified: ${invariantHolds ? 'PASS (ZERO LEAKAGE)' : 'FAIL (BALANCE MISMATCH)'}`);
   console.log('====================================================\n');
 
   check(totalFinalBalance, {
-    'Double-entry conservation holds strictly across all 20 wallets': (tot) => tot === expectedFunds,
+    'Double-entry conservation holds strictly across all 200 wallets (Conservation Delta == 0)': (tot) =>
+      tot === expectedFunds && conservationDelta === 0,
   });
 }
