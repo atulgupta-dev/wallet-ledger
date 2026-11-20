@@ -44,6 +44,7 @@ public class SecurityConfig {
                 .exceptionHandling(ex -> ex.authenticationEntryPoint(authenticationEntryPoint))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
+                                "/",
                                 "/api/v1/auth/**",
                                 "/actuator/**",
                                 "/v3/api-docs/**",

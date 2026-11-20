@@ -325,6 +325,20 @@ docker compose up -d postgres redis kafka prometheus grafana
 docker build -t fintech/wallet-ledger:latest .
 ```
 
+### 4. Zero-Cost Cloud Deployment (Render / Koyeb + Neon + Upstash)
+
+The service is pre-configured for instant zero-cost cloud deployment:
+- **Hosting / Compute**: [Render](https://render.com) Web Service or [Koyeb](https://koyeb.com) (using the multi-stage [Dockerfile](Dockerfile))
+- **Database**: [Neon](https://neon.tech) (Serverless PostgreSQL 16 with pooling)
+- **Cache & Distributed Locks**: [Upstash](https://upstash.com) (Serverless Redis with TLS `rediss://`)
+- **Interactive Documentation**: Root URL (`GET /`) automatically redirects to interactive Swagger API documentation (`/swagger-ui/index.html`).
+
+Refer to [.env.example](.env.example) for the full list of environment variables:
+- `PORT`: Set dynamically by Render/Koyeb (defaults to `8080`).
+- `SPRING_DATASOURCE_URL`: Your Neon pooled connection string (with `?sslmode=require`).
+- `SPRING_DATA_REDIS_HOST`, `SPRING_DATA_REDIS_PORT`, `SPRING_DATA_REDIS_PASSWORD`, `REDIS_SSL=true`: From Upstash console.
+- `APP_KAFKA_ENABLED=false`: Toggles Kafka off for lightweight free-tier deployment while keeping local Kafka streaming active.
+
 ---
 
 ## License

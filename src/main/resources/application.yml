@@ -3,9 +3,9 @@ spring:
     name: wallet-ledger
 
   datasource:
-    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:wallet_ledger}
-    username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD:postgres}
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:wallet_ledger}}
+    username: ${SPRING_DATASOURCE_USERNAME:${DB_USERNAME:postgres}}
+    password: ${SPRING_DATASOURCE_PASSWORD:${DB_PASSWORD:postgres}}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 40
@@ -35,12 +35,17 @@ spring:
 
   data:
     redis:
-      host: ${REDIS_HOST:localhost}
-      port: ${REDIS_PORT:6379}
+      host: ${SPRING_DATA_REDIS_HOST:${REDIS_HOST:localhost}}
+      port: ${SPRING_DATA_REDIS_PORT:${REDIS_PORT:6379}}
+      password: ${SPRING_DATA_REDIS_PASSWORD:${REDIS_PASSWORD:}}
+      ssl:
+        enabled: ${SPRING_DATA_REDIS_SSL_ENABLED:${REDIS_SSL:false}}
       timeout: 2000ms
 
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    listener:
+      auto-startup: ${APP_KAFKA_ENABLED:true}
     consumer:
       group-id: wallet-ledger-group
       auto-offset-reset: earliest
@@ -53,7 +58,7 @@ spring:
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
 
 server:
-  port: 8080
+  port: ${PORT:8080}
   shutdown: graceful
 
 management:
@@ -95,6 +100,8 @@ security:
     window-seconds: ${RATE_LIMIT_WINDOW_SECONDS:60}
 
 app:
+  kafka:
+    enabled: ${APP_KAFKA_ENABLED:true}
   rate-limit:
     enabled: ${RATE_LIMIT_ENABLED:true}
     limit: ${RATE_LIMIT_MAX:60}
