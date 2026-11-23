@@ -1,6 +1,6 @@
 # High-Throughput Double-Entry Wallet & Ledger Engine
 
-[![CI/CD Pipeline](https://github.com/fintech/wallet-ledger/actions/workflows/ci.yml/badge.svg)](https://github.com/fintech/wallet-ledger/actions/workflows/ci.yml)
+[![CI/CD Pipeline](https://github.com/atulgupta-dev/wallet-ledger/actions/workflows/ci.yml/badge.svg)](https://github.com/atulgupta-dev/wallet-ledger/actions/workflows/ci.yml)
 [![Java 21](https://img.shields.io/badge/Java-21-orange.svg)](https://adoptium.net/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.4.2-brightgreen.svg)](https://spring.io/projects/spring-boot)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue.svg)](https://www.postgresql.org/)
