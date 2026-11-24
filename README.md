@@ -322,10 +322,16 @@ docker compose up -d postgres redis kafka prometheus grafana
 
 ### 3. Build Production Container
 ```bash
-docker build -t fintech/wallet-ledger:latest .
+docker build -t wallet-ledger:latest .
 ```
 
-### 4. Zero-Cost Cloud Deployment (Render / Koyeb + Neon + Upstash)
+### 4. Run Test Suite & Concurrency Benchmarks
+```bash
+# Execute 19 unit, integration, and Testcontainers concurrency tests
+./mvnw test
+```
+
+### 5. Zero-Cost Cloud Deployment (Render / Koyeb + Neon + Upstash)
 
 The service is pre-configured for instant zero-cost cloud deployment:
 - **Hosting / Compute**: [Render](https://render.com) Web Service or [Koyeb](https://koyeb.com) (using the multi-stage [Dockerfile](Dockerfile))
